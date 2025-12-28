@@ -34,40 +34,31 @@ st.markdown("""
         box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
         margin-bottom: 20px;
     }
-    .range-label {
-        font-size: 0.8rem;
-        color: var(--accent-color);
-        font-weight: bold;
-        margin-bottom: -10px;
-    }
+    .range-label { font-size: 0.8rem; color: var(--accent-color); font-weight: bold; margin-bottom: -10px; }
     label, h1, h2, h3 { color: var(--text-color) !important; }
-    .stButton>button {
-        background-color: var(--accent-color);
-        color: #000000;
-        font-weight: bold;
-        border: none;
-        border-radius: 8px;
-        width: 100%;
-        height: 50px;
-    }
+    .stButton>button { background-color: var(--accent-color); color: #000000; font-weight: bold; width: 100%; height: 50px; }
     </style>
     """, unsafe_allow_html=True)
 
 # --- LOAD THE MODEL BUNDLE ---
 @st.cache_resource
 def load_bundle():
+    # Make sure this file is uploaded to your GitHub repository!
     with open("lbv_model_bundle.pkl", "rb") as f:
         return pickle.load(f)
 
-bundle = load_bundle()
-model = bundle["model"]
-le = bundle["label_encoder"]
+try:
+    bundle = load_bundle()
+    model = bundle["model"]
+    le = bundle["label_encoder"]
+except FileNotFoundError:
+    st.error("❌ Error: 'lbv_model_bundle.pkl' not found. Please upload it to your GitHub repo.")
+    st.stop()
 
-# Initialize Session State for History
 if 'history' not in st.session_state:
     st.session_state.history = []
 
-# --- ACTUAL DATA RANGES (From Dataset Analysis) ---
+# --- ACTUAL DATA RANGES (From master_dataset.csv) ---
 fuel_options = {
     "ethyl_valerate": {"t": (120, 610), "phi": (0.7, 1.4), "p": (1, 1), "blend": False},
     "propane_air": {"t": (300, 650), "phi": (0.7, 1.3), "p": (1, 5), "blend": False},
@@ -89,77 +80,63 @@ fuel_options = {
     "LPG_air": {"t": (300, 600), "phi": (0.7, 1.7), "p": (1, 1), "blend": False}
 }
 
-# --- APP LAYOUT ---
 st.title("🧪 LBV Predictor: Research Dashboard")
 col_main, col_hist = st.columns([2.5, 1])
 
 with col_main:
     st.markdown('<div class="input-card">', unsafe_allow_html=True)
-    
-    # 1. Fuel selection
     fuel = st.selectbox("HYDROCARBON SELECTION", list(fuel_options.keys()))
     data = fuel_options[fuel]
     
-    # Warning for high-error fuels
     if fuel in ["methane_air", "ch4_h2_air"]:
-        st.warning("⚠️ High data variance detected for this fuel. Expect ±8 cm/s margin of error.")
+        st.warning("⚠️ High experimental variance detected for this fuel.")
 
-    # 2. Conditional Fractions
     frac_a, frac_b = 1.0, 0.0
     if data["blend"]:
         c1, c2 = st.columns(2)
         with c1:
-            st.markdown('<p class="range-label">Range: 0.0 - 1.0</p>', unsafe_allow_html=True)
             frac_a = st.select_slider("FRACTION A", options=[round(x*0.01, 2) for x in range(101)], value=0.5)
         with c2:
-            st.markdown('<p class="range-label">Range: 0.0 - 1.0</p>', unsafe_allow_html=True)
             frac_b = st.select_slider("FRACTION B", options=[round(x*0.01, 2) for x in range(101)], value=0.5)
-    else:
-        st.info(f"Fixed composition for {fuel}.")
 
-    # 3. Sliders with Range Indicators
-    st.markdown(f'<p class="range-label">Dataset Limit: {data["p"][0]} - {data["p"][1]} bar</p>', unsafe_allow_html=True)
+    st.markdown(f'<p class="range-label">Limit: {data["p"][0]} - {data["p"][1]} bar</p>', unsafe_allow_html=True)
     pres = st.select_slider("PRESSURE (bar)", options=list(range(data["p"][0], data["p"][1] + 1)))
 
-    st.markdown(f'<p class="range-label">Dataset Limit: {data["t"][0]} - {data["t"][1]} K</p>', unsafe_allow_html=True)
-    temp = st.select_slider("INITIAL TEMPERATURE (K)", options=list(range(data["t"][0], data["t"][1] + 1, 1)))
+    st.markdown(f'<p class="range-label">Limit: {data["t"][0]} - {data["t"][1]} K</p>', unsafe_allow_html=True)
+    temp = st.select_slider("INITIAL TEMPERATURE (K)", options=list(range(int(data["t"][0]), int(data["t"][1]) + 1)))
 
-    st.markdown(f'<p class="range-label">Dataset Limit: {data["phi"][0]} - {data["phi"][1]}</p>', unsafe_allow_html=True)
+    st.markdown(f'<p class="range-label">Limit: {data["phi"][0]} - {data["phi"][1]}</p>', unsafe_allow_html=True)
     phi_opts = [round(x*0.01, 2) for x in range(int(data["phi"][0]*100), int(data["phi"][1]*100) + 1)]
     phi = st.select_slider("EQUIVALENCE RATIO (φ)", options=phi_opts, value=phi_opts[len(phi_opts)//2])
 
-    # 4. Predict
     st.write("---")
     u_col, b_col = st.columns([1, 2])
     with u_col:
         m_s_toggle = st.toggle("Show in m/s")
     
     if st.button("PREDICT LBV"):
-        # Model Feature Preparation
-        fuel_encoded = le.transform([fuel])[0]
-        input_row = pd.DataFrame([[fuel_encoded, frac_a, frac_b, phi, temp, pres]], 
-                                columns=['fuel_id_encoded', 'frac_A', 'frac_B', 'phi', 'temperature_K', 'pressure_bar'])
-        
-        # Prediction
-        res_cm = model.predict(input_row)[0]
-        final_val = res_cm / 100 if m_s_toggle else res_cm
-        unit = "m/s" if m_s_toggle else "cm/s"
-        
-        st.success("Analysis Complete")
-        st.metric("Laminar Burning Velocity", f"{final_val:.4f} {unit}")
-        
-        # Add to history
-        st.session_state.history.insert(0, {"f": fuel, "phi": phi, "res": f"{final_val:.2f} {unit}"})
+        # MODEL PREDICTION LOGIC
+        try:
+            fuel_encoded = le.transform([fuel])[0]
+            input_row = pd.DataFrame([[fuel_encoded, frac_a, frac_b, phi, temp, pres]], 
+                                    columns=['fuel_id_encoded', 'frac_A', 'frac_B', 'phi', 'temperature_K', 'pressure_bar'])
+            res_cm = model.predict(input_row)[0]
+            final_val = res_cm / 100 if m_s_toggle else res_cm
+            unit = "m/s" if m_s_toggle else "cm/s"
+            
+            st.success("Analysis Complete")
+            st.metric("Laminar Burning Velocity", f"{final_val:.4f} {unit}")
+            st.session_state.history.insert(0, {"f": fuel, "phi": phi, "res": f"{final_val:.2f} {unit}"})
+        except Exception as e:
+            st.error(f"Prediction Error: {e}")
 
     st.markdown('</div>', unsafe_allow_html=True)
 
 with col_hist:
     st.markdown('<div class="input-card">', unsafe_allow_html=True)
     st.subheader("📜 History")
-    if not st.session_state.history:
-        st.write("No predictions yet.")
-    else:
-        for entry in st.session_state.history[:5]:
-            st.markdown(f"**{entry['f']}** (φ={entry['phi']}) → `{entry['res']}`")
-            st.write("---")
+    for entry in st.session_state.history[:5]:
+        st.markdown(f"**{entry['f']}** (φ={entry['phi']}) → `{entry['res']}`")
+        st.write("---")
     st.markdown('</div>', unsafe_allow_html=True)
+        
