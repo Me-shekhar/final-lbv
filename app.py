@@ -1,118 +1,134 @@
 import streamlit as st
 import pandas as pd
 
-# --- NEUBRUTALISM STYLING ---
+# --- UI CONFIGURATION ---
+st.set_page_config(page_title="LBV Predictor Dashboard", layout="wide")
+
+# --- CUSTOM CSS FOR BLUE/WHITE THEME & DASHBOARD LAYOUT ---
 st.markdown("""
     <style>
-    /* Main Background */
-    .stApp { background-color: #FFFFFF; color: #000000; }
+    /* Background and Sidebar */
+    .stApp { background-color: #F0F4F8; }
+    [data-testid="stSidebar"] { background-color: #FFFFFF; border-right: 1px solid #D1E1F0; }
     
-    /* Input Box Containers */
-    div[data-baseweb="select"], div[data-baseweb="slider"], .stNumberInput {
-        border: 2px solid #000000 !important;
-        border-radius: 0px !important;
-        box-shadow: 4px 4px 0px #000000;
+    /* Headers */
+    h1, h2, h3 { color: #1E3A8A; font-family: 'Inter', sans-serif; }
+    
+    /* Cards for Inputs and History */
+    .input-card {
+        background-color: #FFFFFF;
+        padding: 20px;
+        border-radius: 15px;
+        border: 1px solid #E2E8F0;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+        margin-bottom: 20px;
+    }
+    
+    /* Range Label Styling */
+    .range-label {
+        font-size: 0.85rem;
+        color: #64748B;
+        font-weight: 600;
+        margin-bottom: -15px;
     }
 
-    /* Buttons */
+    /* Prediction Button */
     .stButton>button {
         width: 100%;
-        background-color: #000000;
-        color: #FFFFFF;
-        border: 2px solid #000000;
-        border-radius: 0px;
+        background-color: #2563EB;
+        color: white;
+        border-radius: 10px;
+        border: none;
+        height: 50px;
         font-weight: bold;
-        box-shadow: 4px 4px 0px #888888;
-        transition: 0.2s;
+        font-size: 1.1rem;
     }
-    .stButton>button:hover {
-        background-color: #FFFFFF;
-        color: #000000;
-        box-shadow: 2px 2px 0px #000000;
-    }
-
-    /* Range Labels */
-    .range-label {
-        font-size: 0.8rem;
-        font-weight: bold;
-        color: #555555;
-        margin-bottom: -10px;
-    }
-
-    /* History Cards */
-    .history-card {
-        border: 2px solid #000000;
-        padding: 10px;
-        margin-bottom: 10px;
-        box-shadow: 3px 3px 0px #000000;
-    }
+    .stButton>button:hover { background-color: #1E40AF; color: white; }
+    
+    /* Metric Display */
+    [data-testid="stMetricValue"] { color: #2563EB; font-size: 2.5rem !important; }
     </style>
     """, unsafe_allow_html=True)
 
-# --- MOCK DATA RANGES (Replace these with your actual dataset min/max) ---
-fuel_data_info = {
-    "Methane (CH4)": {"temp": (300, 600), "phi": (0.7, 1.4), "pres": (1, 10), "blend": False},
-    "Hydrogen (H2)": {"temp": (300, 500), "phi": (0.5, 4.0), "pres": (1, 5), "blend": False},
-    "CH4-H2 Blend": {"temp": (300, 800), "phi": (0.6, 1.6), "pres": (1, 20), "blend": True}
+# --- MOCK DATA RANGES (Update with your CSV values later) ---
+fuel_info = {
+    "Methane (CH4)": {"t": (300, 600), "p": (0.7, 1.4), "pr": (1, 10), "is_blend": False},
+    "Hydrogen (H2)": {"t": (300, 500), "p": (0.5, 4.0), "pr": (1, 5), "is_blend": False},
+    "CH4-H2 Blend": {"t": (300, 800), "p": (0.6, 1.6), "pr": (1, 20), "is_blend": True}
 }
 
-st.title("📂 LBV_RESEARCH_v1.0")
+# --- HEADER SECTION ---
+st.title("🔬 LBV Research Predictor")
+st.markdown("##### Accurate Laminar Burning Velocity forecasting via Experimental & Simulation Data")
 st.write("---")
 
-# 1. FUEL SELECTION
-selected_fuel = st.selectbox("HYDROCARBON / FUEL TYPE", list(fuel_data_info.keys()))
-info = fuel_data_info[selected_fuel]
+# --- MAIN DASHBOARD LAYOUT ---
+col_main, col_hist = st.columns([2.5, 1])
 
-# 2. FRACTIONS (Conditional)
-if info["blend"]:
-    st.markdown('<p class="range-label">Ratio: 0.0 to 1.0</p>', unsafe_allow_html=True)
-    col_a, col_b = st.columns(2)
-    with col_a:
-        frac_a = st.select_slider("FRACTION A", options=[round(x*0.01, 2) for x in range(101)], value=0.5)
-    with col_b:
-        frac_b = st.select_slider("FRACTION B", options=[round(x*0.01, 2) for x in range(101)], value=0.5)
-else:
-    st.info(f"Fixed composition for {selected_fuel}.")
-    frac_a, frac_b = 1.0, 0.0
-
-# 3. ENVIRONMENT PARAMETERS WITH DYNAMIC LABELS
-st.write("") 
-
-# Temperature
-st.markdown(f'<p class="range-label">Valid Range: {info["temp"][0]}K - {info["temp"][1]}K</p>', unsafe_allow_html=True)
-temp = st.select_slider("INITIAL TEMPERATURE (K)", 
-                        options=list(range(info["temp"][0], info["temp"][1] + 1, 10)))
-
-# Equivalence Ratio
-st.markdown(f'<p class="range-label">Valid Range: {info["phi"][0]} - {info["phi"][1]}</p>', unsafe_allow_html=True)
-phi = st.select_slider("EQUIVALENCE RATIO (φ)", 
-                       options=[round(x*0.1, 1) for x in range(int(info["phi"][0]*10), int(info["phi"][1]*10) + 1)])
-
-# Pressure
-st.markdown(f'<p class="range-label">Valid Range: {info["pres"][0]}atm - {info["pres"][1]}atm</p>', unsafe_allow_html=True)
-pres = st.select_slider("PRESSURE (atm)", 
-                        options=list(range(info["pres"][0], info["pres"][1] + 1)))
-
-# 4. PREDICT AND TOGGLE
-st.write("---")
-unit_toggle = st.toggle("CONVERT TO m/s")
-
-if st.button("PREDICT LBV"):
-    # Mock result until PKL is connected
-    res_cm = 38.2
-    display_res = res_cm / 100 if unit_toggle else res_cm
-    unit = "m/s" if unit_toggle else "cm/s"
+with col_main:
+    st.markdown('<div class="input-card">', unsafe_allow_html=True)
+    st.subheader("🛠️ Input Parameters")
     
-    st.markdown(f"""
-        <div style="border: 3px solid black; padding: 20px; background-color: #00ff00; box-shadow: 6px 6px 0px black;">
-            <h2 style="margin:0;">RESULT: {display_res} {unit}</h2>
-        </div>
-    """, unsafe_allow_html=True)
+    # 1. Fuel Selection
+    fuel = st.selectbox("Select Hydrocarbon / Fuel Type", list(fuel_info.keys()))
+    current = fuel_info[fuel]
+    
+    # 2. Fractions Section (Unlocks only for blends)
+    if current["is_blend"]:
+        f_col1, f_col2 = st.columns(2)
+        with f_col1:
+            st.markdown('<p class="range-label">Range: 0.0 - 1.0</p>', unsafe_allow_html=True)
+            frac_a = st.select_slider("Fraction A", options=[round(x*0.01, 2) for x in range(101)], value=0.5)
+        with f_col2:
+            st.markdown('<p class="range-label">Range: 0.0 - 1.0</p>', unsafe_allow_html=True)
+            frac_b = st.select_slider("Fraction B", options=[round(x*0.01, 2) for x in range(101)], value=0.5)
+    else:
+        st.info("💡 Fraction controls locked for single-component fuels.")
+        frac_a, frac_b = 1.0, 0.0
 
-# 5. HISTORY
-st.write("### 📜 HISTORY")
-st.markdown("""
-    <div class="history-card">
-        <strong>CH4</strong> | Temp: 300K | Phi: 1.0 | <strong>38.2 cm/s</strong>
-    </div>
-""", unsafe_allow_html=True)
+    # 3. Sliders with Range Labels above them
+    st.write("")
+    
+    # Temperature
+    st.markdown(f'<p class="range-label">Valid Range: {current["t"][0]}K - {current["t"][1]}K</p>', unsafe_allow_html=True)
+    temp = st.select_slider("Initial Temperature (K)", options=list(range(current["t"][0], current["t"][1]+1, 5)))
+
+    # Equivalence Ratio
+    st.markdown(f'<p class="range-label">Valid Range: {current["p"][0]} - {current["p"][1]}</p>', unsafe_allow_html=True)
+    phi = st.select_slider("Equivalence Ratio (φ)", options=[round(x*0.1, 1) for x in range(int(current["p"][0]*10), int(current["p"][1]*10)+1)])
+
+    # Pressure
+    st.markdown(f'<p class="range-label">Valid Range: {current["pr"][0]}atm - {current["pr"][1]}atm</p>', unsafe_allow_html=True)
+    pres = st.select_slider("Pressure (atm)", options=list(range(current["pr"][0], current["pr"][1]+1)))
+
+    # 4. Action Section
+    st.write("---")
+    unit_col, btn_col = st.columns([1, 2])
+    with unit_col:
+        unit_toggle = st.toggle("Convert to m/s", help="Toggle between cm/s and m/s")
+    
+    if st.button("🚀 PREDICT LBV"):
+        # Placeholder for Model Prediction
+        res_cm = 42.15 
+        final_val = res_cm / 100 if unit_toggle else res_cm
+        u_label = "m/s" if unit_toggle else "cm/s"
+        st.metric(label="Predicted Result", value=f"{final_val:.4f} {u_label}")
+    
+    st.markdown('</div>', unsafe_allow_html=True)
+
+with col_hist:
+    st.markdown('<div class="input-card">', unsafe_allow_html=True)
+    st.subheader("📜 Recent History")
+    
+    # Sample History Items
+    history_data = [
+        {"f": "CH4", "phi": 1.0, "v": "38.2 cm/s"},
+        {"f": "H2", "phi": 1.2, "v": "120.4 cm/s"},
+        {"f": "Blend", "phi": 0.9, "v": "45.1 cm/s"}
+    ]
+    
+    for item in history_data:
+        st.write(f"**{item['f']}** | φ: {item['phi']} → `{item['v']}`")
+        st.write("---")
+    
+    st.markdown('</div>', unsafe_allow_html=True)
