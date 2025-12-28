@@ -43,20 +43,26 @@ st.markdown("""
 # --- LOAD THE MODEL BUNDLE ---
 @st.cache_resource
 def load_bundle():
-    # Make sure this file is uploaded to your GitHub repository!
-    with open("lbv_model_bundle.pkl", "rb") as f:
-        return pickle.load(f)
-
-try:
-    bundle = load_bundle()
-    model = bundle["model"]
-    le = bundle["label_encoder"]
-except FileNotFoundError:
-    st.error("❌ Error: 'lbv_model_bundle.pkl' not found. Please upload it to your GitHub repo.")
-    st.stop()
-
-if 'history' not in st.session_state:
-    st.session_state.history = []
+    try:
+        # Check if the file actually exists first
+        import os
+        if not os.path.exists("lbv_model_bundle.pkl"):
+            st.error("File 'lbv_model_bundle.pkl' not found in the repository!")
+            st.stop()
+            
+        with open("lbv_model_bundle.pkl", "rb") as f:
+            return pickle.load(f)
+            
+    except ModuleNotFoundError as e:
+        st.error(f"⚠️ **Library Mismatch:** The model needs a library that isn't in your requirements.txt: `{e}`")
+        st.info("Check if 'scikit-learn' and 'xgboost' are spelled correctly in requirements.txt")
+        st.stop()
+    except AttributeError as e:
+        st.error(f"⚠️ **Version Conflict:** The version of Scikit-Learn or XGBoost in Colab is different from Streamlit. Error: `{e}`")
+        st.stop()
+    except Exception as e:
+        st.error(f"⚠️ **Unexpected Error:** {e}")
+        st.stop()
 
 # --- ACTUAL DATA RANGES (From master_dataset.csv) ---
 fuel_options = {
