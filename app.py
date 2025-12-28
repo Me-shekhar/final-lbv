@@ -1,110 +1,118 @@
 import streamlit as st
 import pandas as pd
-import time
 
-# --- PAGE CONFIG ---
-st.set_page_config(page_title="LBV Predictor", layout="centered")
-
-# --- CUSTOM AESTHETIC STYLING (Healing Colors) ---
+# --- NEUBRUTALISM STYLING ---
 st.markdown("""
     <style>
-    .main { background-color: #f0f4f4; }
-    .stButton>button {
-        background-color: #4db6ac;
-        color: white;
-        border-radius: 20px;
-        border: none;
-        padding: 10px 24px;
+    /* Main Background */
+    .stApp { background-color: #FFFFFF; color: #000000; }
+    
+    /* Input Box Containers */
+    div[data-baseweb="select"], div[data-baseweb="slider"], .stNumberInput {
+        border: 2px solid #000000 !important;
+        border-radius: 0px !important;
+        box-shadow: 4px 4px 0px #000000;
     }
-    .stButton>button:hover { background-color: #00897b; border: none; }
-    div[data-testid="stMetricValue"] { color: #00796b; }
-    .history-box {
-        background-color: white;
-        padding: 15px;
-        border-radius: 10px;
-        box-shadow: 2px 2px 10px rgba(0,0,0,0.05);
+
+    /* Buttons */
+    .stButton>button {
+        width: 100%;
+        background-color: #000000;
+        color: #FFFFFF;
+        border: 2px solid #000000;
+        border-radius: 0px;
+        font-weight: bold;
+        box-shadow: 4px 4px 0px #888888;
+        transition: 0.2s;
+    }
+    .stButton>button:hover {
+        background-color: #FFFFFF;
+        color: #000000;
+        box-shadow: 2px 2px 0px #000000;
+    }
+
+    /* Range Labels */
+    .range-label {
+        font-size: 0.8rem;
+        font-weight: bold;
+        color: #555555;
+        margin-bottom: -10px;
+    }
+
+    /* History Cards */
+    .history-card {
+        border: 2px solid #000000;
+        padding: 10px;
+        margin-bottom: 10px;
+        box-shadow: 3px 3px 0px #000000;
     }
     </style>
     """, unsafe_allow_html=True)
 
-# --- SESSION STATE FOR HISTORY ---
-if 'history' not in st.session_state:
-    st.session_state.history = []
+# --- MOCK DATA RANGES (Replace these with your actual dataset min/max) ---
+fuel_data_info = {
+    "Methane (CH4)": {"temp": (300, 600), "phi": (0.7, 1.4), "pres": (1, 10), "blend": False},
+    "Hydrogen (H2)": {"temp": (300, 500), "phi": (0.5, 4.0), "pres": (1, 5), "blend": False},
+    "CH4-H2 Blend": {"temp": (300, 800), "phi": (0.6, 1.6), "pres": (1, 20), "blend": True}
+}
 
-# --- APP HEADER ---
-st.title("🌿 LBV Research Portal")
-st.markdown("Select your parameters below to predict **Laminar Burning Velocity**.")
+st.title("📂 LBV_RESEARCH_v1.0")
+st.write("---")
 
-# --- INPUT SECTION ---
-with st.container():
-    st.subheader("Parameter Selection")
-    
-    # 1. Fuel Selection (Dropdown only)
-    fuel_list = ["Methane (CH4)", "Hydrogen (H2)", "Methane-Hydrogen Blend", "Propane", "Syngas"]
-    selected_fuel = st.selectbox("Select Fuel Type", options=fuel_list, index=0)
+# 1. FUEL SELECTION
+selected_fuel = st.selectbox("HYDROCARBON / FUEL TYPE", list(fuel_data_info.keys()))
+info = fuel_data_info[selected_fuel]
 
-    # 2. Fractions Logic (Unlocked only if "Blend" is selected)
-    # You can customize this list based on which fuels in your dataset are blends
-    col1, col2 = st.columns(2)
-    if "Blend" in selected_fuel or "Syngas" in selected_fuel:
-        with col1:
-            frac_a = st.select_slider("Fraction A", options=[round(x * 0.01, 2) for x in range(0, 101)], value=0.50)
-        with col2:
-            frac_b = st.select_slider("Fraction B", options=[round(x * 0.01, 2) for x in range(0, 101)], value=0.50)
-    else:
-        frac_a = 1.0
-        frac_b = 0.0
-        st.info("Single component fuel selected. Fractions are locked.")
-
-    # 3. Environment Parameters (Slider only to prevent typing)
-    phi = st.select_slider("Equivalence Ratio (φ)", options=[round(x * 0.1, 1) for x in range(5, 26)], value=1.0)
-    temp = st.select_slider("Initial Temperature (K)", options=list(range(300, 801, 10)), value=300)
-    pres = st.select_slider("Pressure (bar)", options=list(range(1, 51)), value=1)
-
-# --- PREDICTION & TOGGLE ---
-st.divider()
-t_col1, t_col2 = st.columns([2, 1])
-
-with t_col2:
-    unit_mode = st.toggle("Switch to m/s", value=False)
-
-if st.button("Predict LBV", use_container_width=True):
-    with st.spinner('Calculating physics...'):
-        time.sleep(0.5) # Simulating calculation
-        
-        # NOTE: Once we create the .pkl, we will replace this dummy math
-        # Placeholder prediction (cm/s)
-        dummy_prediction = 35.42 + (phi * 2) + (temp / 100) 
-        
-        # Unit conversion
-        if unit_mode:
-            final_val = dummy_prediction / 100
-            unit = "m/s"
-        else:
-            final_val = dummy_prediction
-            unit = "cm/s"
-            
-        st.metric(label="Predicted Result", value=f"{final_val:.4f} {unit}")
-        
-        # Add to history
-        new_entry = {
-            "Fuel": selected_fuel,
-            "Phi": phi,
-            "Temp": temp,
-            "Result": f"{final_val:.4f} {unit}"
-        }
-        st.session_state.history.insert(0, new_entry)
-
-# --- HISTORY SECTION ---
-st.divider()
-st.subheader("📜 Prediction History")
-if st.session_state.history:
-    for item in st.session_state.history[:5]: # Show last 5
-        st.markdown(f"""
-        <div class="history-box">
-            <strong>Fuel:</strong> {item['Fuel']} | <strong>Phi:</strong> {item['Phi']} | 
-            <strong>Temp:</strong> {item['Temp']}K | <strong>LBV:</strong> {item['Result']}
-        </div><br>
-        """, unsafe_allow_html=True)
+# 2. FRACTIONS (Conditional)
+if info["blend"]:
+    st.markdown('<p class="range-label">Ratio: 0.0 to 1.0</p>', unsafe_allow_html=True)
+    col_a, col_b = st.columns(2)
+    with col_a:
+        frac_a = st.select_slider("FRACTION A", options=[round(x*0.01, 2) for x in range(101)], value=0.5)
+    with col_b:
+        frac_b = st.select_slider("FRACTION B", options=[round(x*0.01, 2) for x in range(101)], value=0.5)
 else:
-    st.write("No predictions yet.")
+    st.info(f"Fixed composition for {selected_fuel}.")
+    frac_a, frac_b = 1.0, 0.0
+
+# 3. ENVIRONMENT PARAMETERS WITH DYNAMIC LABELS
+st.write("") 
+
+# Temperature
+st.markdown(f'<p class="range-label">Valid Range: {info["temp"][0]}K - {info["temp"][1]}K</p>', unsafe_allow_html=True)
+temp = st.select_slider("INITIAL TEMPERATURE (K)", 
+                        options=list(range(info["temp"][0], info["temp"][1] + 1, 10)))
+
+# Equivalence Ratio
+st.markdown(f'<p class="range-label">Valid Range: {info["phi"][0]} - {info["phi"][1]}</p>', unsafe_allow_html=True)
+phi = st.select_slider("EQUIVALENCE RATIO (φ)", 
+                       options=[round(x*0.1, 1) for x in range(int(info["phi"][0]*10), int(info["phi"][1]*10) + 1)])
+
+# Pressure
+st.markdown(f'<p class="range-label">Valid Range: {info["pres"][0]}atm - {info["pres"][1]}atm</p>', unsafe_allow_html=True)
+pres = st.select_slider("PRESSURE (atm)", 
+                        options=list(range(info["pres"][0], info["pres"][1] + 1)))
+
+# 4. PREDICT AND TOGGLE
+st.write("---")
+unit_toggle = st.toggle("CONVERT TO m/s")
+
+if st.button("PREDICT LBV"):
+    # Mock result until PKL is connected
+    res_cm = 38.2
+    display_res = res_cm / 100 if unit_toggle else res_cm
+    unit = "m/s" if unit_toggle else "cm/s"
+    
+    st.markdown(f"""
+        <div style="border: 3px solid black; padding: 20px; background-color: #00ff00; box-shadow: 6px 6px 0px black;">
+            <h2 style="margin:0;">RESULT: {display_res} {unit}</h2>
+        </div>
+    """, unsafe_allow_html=True)
+
+# 5. HISTORY
+st.write("### 📜 HISTORY")
+st.markdown("""
+    <div class="history-card">
+        <strong>CH4</strong> | Temp: 300K | Phi: 1.0 | <strong>38.2 cm/s</strong>
+    </div>
+""", unsafe_allow_html=True)
