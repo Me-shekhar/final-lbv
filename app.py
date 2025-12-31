@@ -95,22 +95,42 @@ with col_main:
     else:
         st.info(f"Fixed composition for {selected_fuel} (Pure Fuel).")
 
-    # 3. THERMODYNAMIC SLIDERS (Using Metadata Ranges)
+  # --- 3. THERMODYNAMIC INPUTS (WITH RANGE ERROR FIX) ---
+    
+    # PRESSURE
     st.markdown(f'<p class="range-label">Training Limit: {fuel_info["pres_range"][0]} - {fuel_info["pres_range"][1]} bar</p>', unsafe_allow_html=True)
-    p_opts = list(range(int(fuel_info["pres_range"][0]), int(fuel_info["pres_range"][1]) + 1))
-    pres = st.select_slider("PRESSURE (bar)", options=p_opts, key=f"p_{selected_fuel}")
+    p_min, p_max = fuel_info["pres_range"]
+    p_opts = list(range(int(p_min), int(p_max) + 1))
+    
+    if len(p_opts) > 1:
+        pres = st.select_slider("PRESSURE (bar)", options=p_opts, key=f"p_{selected_fuel}")
+    else:
+        st.info(f"Fixed Pressure: **{p_opts[0]} bar**")
+        pres = p_opts[0]
 
+    # TEMPERATURE
     st.markdown(f'<p class="range-label">Training Limit: {fuel_info["temp_range"][0]} - {fuel_info["temp_range"][1]} K</p>', unsafe_allow_html=True)
-    t_opts = list(range(int(fuel_info["temp_range"][0]), int(fuel_info["temp_range"][1]) + 1))
-    temp = st.select_slider("INITIAL TEMPERATURE (K)", options=t_opts, key=f"t_{selected_fuel}")
+    t_min, t_max = fuel_info["temp_range"]
+    t_opts = list(range(int(t_min), int(t_max) + 1))
+    
+    if len(t_opts) > 1:
+        temp = st.select_slider("INITIAL TEMPERATURE (K)", options=t_opts, key=f"t_{selected_fuel}")
+    else:
+        st.info(f"Fixed Temperature: **{t_opts[0]} K**")
+        temp = t_opts[0]
 
+    # EQUIVALENCE RATIO (phi)
     st.markdown(f'<p class="range-label">Training Limit: {fuel_info["phi_range"][0]} - {fuel_info["phi_range"][1]}</p>', unsafe_allow_html=True)
     phi_min, phi_max = fuel_info["phi_range"]
-    phi_opts = [round(x*0.01, 2) for x in range(int(phi_min*100), int(phi_max*100) + 1)]
-    phi = st.select_slider("EQUIVALENCE RATIO (φ)", options=phi_opts, value=phi_opts[len(phi_opts)//2], key=f"phi_{selected_fuel}")
-
-    st.write("---")
-    m_s_toggle = st.toggle("Show in m/s")
+    phi_start = int(round(phi_min * 100))
+    phi_end = int(round(phi_max * 100))
+    phi_opts = [round(x*0.01, 2) for x in range(phi_start, phi_end + 1)]
+    
+    if len(phi_opts) > 1:
+        phi = st.select_slider("EQUIVALENCE RATIO (φ)", options=phi_opts, value=phi_opts[len(phi_opts)//2], key=f"phi_{selected_fuel}")
+    else:
+        st.info(f"Fixed Phi: **{phi_opts[0]}**")
+        phi = phi_opts[0]
     
     # 4. PREDICTION LOGIC
     if st.button("🚀 PREDICT LBV"):
