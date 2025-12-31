@@ -40,29 +40,42 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-# --- LOAD THE MODEL BUNDLE ---
+
+# --- Load the new bundle ---
 @st.cache_resource
-def load_bundle():
-    try:
-        # Check if the file actually exists first
-        import os
-        if not os.path.exists("lbv_model_bundle.pkl"):
-            st.error("File 'lbv_model_bundle.pkl' not found in the repository!")
-            st.stop()
-            
-        with open("lbv_model_bundle.pkl", "rb") as f:
-            return pickle.load(f)
-            
-    except ModuleNotFoundError as e:
-        st.error(f"⚠️ **Library Mismatch:** The model needs a library that isn't in your requirements.txt: `{e}`")
-        st.info("Check if 'scikit-learn' and 'xgboost' are spelled correctly in requirements.txt")
-        st.stop()
-    except AttributeError as e:
-        st.error(f"⚠️ **Version Conflict:** The version of Scikit-Learn or XGBoost in Colab is different from Streamlit. Error: `{e}`")
-        st.stop()
-    except Exception as e:
-        st.error(f"⚠️ **Unexpected Error:** {e}")
-        st.stop()
+def load_v2():
+    with open("lbv_main_v2.pkl", "rb") as f:
+        return pickle.load(f)
+
+bundle = load_v2()
+model = bundle["model"]
+le = bundle["le"]
+metadata = bundle["metadata"]
+
+# ... (UI Code for sliders) ...
+
+if st.button("PREDICT LBV"):
+    fuel_info = metadata.get(selected_fuel)
+    
+    # 1. CHECK BLEND VALIDITY
+    current_blend = (frac_a, frac_b)
+    if current_blend not in fuel_info["valid_blends"]:
+        st.error(f"❌ This specific blend ratio ({frac_a}:{frac_b}) is not present in the dataset for {selected_fuel}. Please choose a valid ratio.")
+    else:
+        # 2. RUN PREDICTION
+        fuel_encoded = le.transform([selected_fuel])[0]
+        input_row = pd.DataFrame([[fuel_encoded, frac_a, frac_b, phi, temp, pres]], 
+                                columns=['fuel_id_encoded', 'frac_A', 'frac_B', 'phi', 'temperature_K', 'pressure_bar'])
+        
+        prediction = model.predict(input_row)[0]
+        
+        # 3. SHOW OUTPUT WITH SOURCE INFO
+        st.success(f"Prediction complete via {fuel_info['source_info']} model logic.")
+        st.metric("LBV Result", f"{prediction:.4f} cm/s")
+        
+        # 4. OPTIONAL: RANGE WARNING
+        if temp < fuel_info['temp_range'][0] or temp > fuel_info['temp_range'][1]:
+            st.warning("⚠️ Extrapolation Note: This temperature is outside the original training range.")
 
 # --- ACTUAL DATA RANGES (From master_dataset.csv) ---
 fuel_options = {
