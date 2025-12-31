@@ -132,16 +132,25 @@ with col_main:
         st.info(f"Fixed Phi: **{phi_opts[0]}**")
         phi = phi_opts[0]
     
-    # 4. PREDICTION LOGIC
+# 4. PREDICTION LOGIC
     if st.button("🚀 PREDICT LBV"):
         current_blend = (frac_a, frac_b)
         
-        # VALIDATION: Blend Ratio Check
+        # --- SIMPLE & NON-TECHNICAL VALIDATION ERROR ---
         if current_blend not in fuel_info["valid_blends"]:
-            st.error(f"❌ The blend ratio {frac_a}:{frac_b} is not supported for {selected_fuel} in this dataset.")
-            st.markdown("**Available Ratios for this fuel:**")
-            st.write(fuel_info["valid_blends"])
+            st.warning("⚠️ Mixture Not Found in Database")
+            st.write(f"The current setting (**{frac_a} : {frac_b}**) is not available for **{selected_fuel}**.")
+            st.write("Please adjust the sliders to one of these supported mixtures:")
+            
+            # Formatting the technical list into a clean, human-readable list
+            for a, b in fuel_info["valid_blends"]:
+                # Converts 0.7 to 70% and 0.3 to 30%
+                label_a = f"{int(round(a*100))}%" if a > 0 else "0%"
+                label_b = f"{int(round(b*100))}%" if b > 0 else "0%"
+                st.info(f"📍 {label_a} Fraction A + {label_b} Fraction B")
+        
         else:
+            # --- RUN PREDICTION IF VALID ---
             try:
                 fuel_encoded = le.transform([selected_fuel])[0]
                 input_row = pd.DataFrame([[fuel_encoded, frac_a, frac_b, phi, temp, pres]], 
@@ -151,11 +160,17 @@ with col_main:
                 final_val = res_cm / 100 if m_s_toggle else res_cm
                 unit = "m/s" if m_s_toggle else "cm/s"
                 
+                # Show Result with Source Info
                 st.success(f"Analysis Complete using {fuel_info['source_info']} logic.")
                 st.metric("Laminar Burning Velocity", f"{final_val:.4f} {unit}")
                 
                 # Update History
                 st.session_state.history.insert(0, {"f": selected_fuel, "phi": phi, "res": f"{final_val:.2f} {unit}"})
+                
+                # Range Warning for Extrapolation
+                if temp < fuel_info['temp_range'][0] or temp > fuel_info['temp_range'][1]:
+                    st.warning("⚠️ Extrapolation Note: This temperature is outside the original experimental training range.")
+
             except Exception as e:
                 st.error(f"Prediction Error: {e}")
 
